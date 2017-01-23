@@ -36,6 +36,9 @@ class AbstractChosen
     @max_shown_results = @options.max_shown_results || Number.POSITIVE_INFINITY
     @case_sensitive_search = @options.case_sensitive_search || false
     @hide_results_on_select = if @options.hide_results_on_select? then @options.hide_results_on_select else true
+    @create_option = @options.create_option || false
+    @persistent_create_option = @options.persistent_create_option || false
+    @skip_no_results = @options.skip_no_results || false
 
   set_default_text: ->
     if @form_field.getAttribute("data-placeholder")
@@ -48,6 +51,7 @@ class AbstractChosen
     @default_text = this.escape_html(@default_text)
 
     @results_none_found = @form_field.getAttribute("data-no_results_text") || @options.no_results_text || AbstractChosen.default_no_result_text
+    @create_option_text = @form_field.getAttribute("data-create_option_text") || @options.create_option_text || AbstractChosen.default_create_option_text
 
   choice_label: (item) ->
     if @include_group_label_in_selected and item.group_label?
@@ -136,6 +140,9 @@ class AbstractChosen
 
     this.outerHTML(group_el)
 
+  append_option: (option) ->
+    this.select_append_option(option)
+
   results_update_field: ->
     this.set_default_text()
     this.results_reset_cleanup() if not @is_multiple
@@ -163,6 +170,7 @@ class AbstractChosen
     this.no_results_clear()
 
     results = 0
+    exact_result = false
 
     searchText = this.get_search_text()
     escapedSearchText = searchText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")
@@ -191,6 +199,8 @@ class AbstractChosen
           option.search_match = this.search_string_match(option.search_text, regex)
           results += 1 if option.search_match and not option.group
 
+          exact_result = exact_result || eregex.test option.html
+
           if option.search_match
             if searchText.length
               startpos = option.search_text.search highlightRegex
@@ -206,10 +216,13 @@ class AbstractChosen
 
     if results < 1 and searchText.length
       this.update_results_content ""
-      this.no_results searchText
+      this.no_results searchText unless @create_option and @skip_no_results
     else
       this.update_results_content this.results_option_build()
       this.winnow_results_set_highlight()
+
+    if @create_option and (results < 1 or (!exact_result and @persistent_create_option)) and searchText.length
+      this.show_create_option( searchText )
 
   get_search_regex: (escaped_search_string) ->
     regex_anchor = if @search_contains then "" else "^"
@@ -384,4 +397,4 @@ class AbstractChosen
   @default_multiple_text: "Select Some Options"
   @default_single_text: "Select an Option"
   @default_no_result_text: "No results match"
-
+  @default_create_option_text: "Add Option"
